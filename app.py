@@ -33,8 +33,8 @@ def main():
     # Inisialisasi session state jika belum ada
     if "conversation" not in st.session_state:
         # Pastikan GOOGLE_API_KEY tersedia di st.secrets
-        if "GOOGLE_API_KEY" in st.secrets:
-            api_key = st.secrets["GOOGLE_API_KEY"]
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
             llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7, google_api_key=api_key)
             st.session_state.conversation = ConversationChain(
                 prompt=PROMPT,
@@ -42,7 +42,7 @@ def main():
                 memory=ConversationBufferMemory(memory_key="history")
             )
         else:
-            st.error("GOOGLE_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
+            st.error("GEMINI_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
             st.info("Untuk pengembangan lokal, buat file .streamlit/secrets.toml.")
             st.stop()
             
