@@ -15,7 +15,7 @@ except KeyError:
     st.stop()
 
 # Inisialisasi model Gemini dengan kunci API
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash, google_api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
 
 # --- 2. Prompt Engineering dengan Langchain ---
 # Memberikan instruksi spesifik kepada Gemini agar hasilnya konsisten dalam format JSON.
