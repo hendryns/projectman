@@ -1,131 +1,78 @@
 import streamlit as st
-import json
-from langchain.chains import LLMChain
-from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
 import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.chains import ConversationChain
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
 
-# --- 1. Konfigurasi API Gemini ---
-# Mengambil kunci API dari secrets Streamlit.
-# Ini adalah cara paling aman untuk menyimpan kunci API saat deployment.
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except KeyError:
-    st.error("Error: Kunci API 'GEMINI_API_KEY' tidak ditemukan di secrets Streamlit.")
-    st.stop()
+# Template prompt untuk memberikan konteks pada AI
+template = """
+Anda adalah seorang asisten AI yang sangat ahli dalam manajemen proyek.
+Tugas Anda adalah membantu pengguna dengan pertanyaan, saran, dan wawasan terkait manajemen proyek.
+Jawablah pertanyaan dengan jelas, informatif, dan profesional. Anda dapat membantu dalam hal:
+1.  Menjelaskan metodologi (seperti Agile, Scrum, Waterfall).
+2.  Memberikan saran tentang cara mengelola risiko proyek.
+3.  Memberi contoh cara membuat jadwal proyek.
+4.  Menjawab pertanyaan umum tentang alat-alat manajemen proyek.
 
-# Inisialisasi model Gemini dengan kunci API
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
-
-# --- 2. Prompt Engineering dengan Langchain ---
-# Memberikan instruksi spesifik kepada Gemini agar hasilnya konsisten dalam format JSON.
-prompt_template = """
-Kamu adalah bot manajemen proyek. Identifikasi niat pengguna dari teks berikut dan ekstrak informasi penting seperti nama proyek dan nama tugas. Berikan hasilnya dalam format JSON.
-
-Aturan output:
-- Jika niatnya adalah "membuat proyek", niatnya adalah "create_project".
-- Jika niatnya adalah "menambahkan tugas", niatnya adalah "add_task".
-- Jika niatnya adalah "menampilkan proyek", niatnya adalah "show_projects".
-- Jika tidak ada niat yang jelas, niatnya adalah "unknown".
-
-Output harus berupa JSON valid dengan kunci "intent" dan kunci data lainnya sesuai kebutuhan.
-
-Contoh 1:
-Teks: "Buat proyek baru namanya 'Website Perusahaan'"
-Hasil: {{"intent": "create_project", "project_name": "Website Perusahaan"}}
-
-Contoh 2:
-Teks: "Tambah tugas 'Desain UI' ke proyek 'Website Perusahaan'"
-Hasil: {{"intent": "add_task", "task_name": "Desain UI", "project_name": "Website Perusahaan"}}
-
-Teks: "{query}"
-Hasil: 
+Riwayat percakapan saat ini:
+{history}
+Pengguna: {input}
+Asisten AI:
 """
-prompt = PromptTemplate(template=prompt_template, input_variables=["query"])
-llm_chain = LLMChain(prompt=prompt, llm=llm)
 
-# --- 3. Logika Utama Aplikasi Streamlit ---
+PROMPT = PromptTemplate(input_variables=["history", "input"], template=template)
+
 def main():
-    st.title("🤖 Bot Manajemen Proyek dengan Gemini")
-    st.write("Silakan ketikkan perintah kamu. Contoh: 'Buat proyek Marketing' atau 'Tambah tugas buat laporan ke proyek Marketing'.")
+    """Fungsi utama untuk menjalankan aplikasi Streamlit."""
+    st.set_page_config(page_title="Chatbot Manajemen Proyek", page_icon="🤖")
 
-    # Inisialisasi data proyek
-    if 'projects' not in st.session_state:
-        st.session_state.projects = {}
+    st.title("🤖 Chatbot Asisten Manajemen Proyek")
+    st.markdown("Ajukan pertanyaan apa pun tentang manajemen proyek!")
 
-    user_query = st.text_input("Ketikkan perintah di sini:", key="user_input")
-
-    if st.button("Kirim"):
-        if user_query:
-            
-try:
-    # Memanggil Langchain untuk memproses query dengan Gemini
-    st.info("Memproses perintah...")
-    raw_response = llm_chain.run(query=user_query)
-    
-    # --- Solusi: Mencari dan membersihkan JSON dari respons ---
-    start_index = raw_response.find('{')
-    end_index = raw_response.rfind('}')
-    
-    if start_index != -1 and end_index != -1:
-        # Ekstrak string JSON yang valid
-        json_string = raw_response[start_index : end_index + 1]
-        
-        # Mengurai JSON dari respons Gemini
-        parsed_data = json.loads(json_string)
-        
-        # ... (Logika pemrosesan intent yang sudah ada) ...
-        intent = parsed_data.get("intent")
-        
-        if intent == "create_project":
-            project_name = parsed_data.get("project_name")
-            if project_name and project_name not in st.session_state.projects:
-                st.session_state.projects[project_name] = []
-                st.success(f"✅ Proyek **'{project_name}'** berhasil dibuat!")
-            elif project_name:
-                st.warning(f"⚠️ Proyek **'{project_name}'** sudah ada.")
-            else:
-                st.error("❌ Nama proyek tidak ditemukan.")
-
-        elif intent == "add_task":
-            task_name = parsed_data.get("task_name")
-            project_name = parsed_data.get("project_name")
-            if project_name and task_name and project_name in st.session_state.projects:
-                st.session_state.projects[project_name].append(task_name)
-                st.success(f"✅ Tugas **'{task_name}'** berhasil ditambahkan ke proyek **'{project_name}'**.")
-            elif project_name:
-                st.error(f"❌ Proyek **'{project_name}'** tidak ditemukan.")
-            else:
-                st.error("❌ Nama tugas atau proyek tidak ditemukan.")
-
-        elif intent == "show_projects":
-            st.success("Berikut daftar proyek kamu:")
-            if st.session_state.projects:
-                for project, tasks in st.session_state.projects.items():
-                    st.subheader(f"📂 {project}")
-                    if tasks:
-                        for i, task in enumerate(tasks):
-                            st.write(f"   - {i+1}. {task}")
-                    else:
-                        st.write("   _(Tidak ada tugas)_")
-            else:
-                st.write("Belum ada proyek yang dibuat.")
-
+    # Inisialisasi session state jika belum ada
+    if "conversation" not in st.session_state:
+        # Pastikan GOOGLE_API_KEY tersedia di st.secrets
+        if "GOOGLE_API_KEY" in st.secrets:
+            api_key = st.secrets["GOOGLE_API_KEY"]
+            llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7, google_api_key=api_key)
+            st.session_state.conversation = ConversationChain(
+                prompt=PROMPT,
+                llm=llm,
+                memory=ConversationBufferMemory(memory_key="history")
+            )
         else:
-            st.warning("Maaf, saya tidak mengerti perintah itu.")
+            st.error("GOOGLE_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
+            st.info("Untuk pengembangan lokal, buat file .streamlit/secrets.toml.")
+            st.stop()
+            
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    else:
-        st.error("❌ Respons AI tidak mengandung format JSON yang valid. Coba lagi atau periksa respons model.")
-        st.write("Respons mentah (raw response) dari model:", raw_response)
+    # Tampilkan riwayat chat
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Input dari pengguna
+    if prompt := st.chat_input("Tanya sesuatu tentang manajemen proyek..."):
+        # Tambahkan pesan pengguna ke riwayat dan tampilkan
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Dapatkan dan tampilkan respons dari bot
+        with st.chat_message("assistant"):
+            with st.spinner("Memikirkan jawaban..."):
+                response = st.session_state.conversation.predict(input=prompt)
+                st.markdown(response)
         
-except json.JSONDecodeError:
-    st.error("❌ Terjadi kesalahan dalam mengurai respons AI. Mohon coba lagi.")
-except Exception as e:
-    st.error(f"❌ Terjadi kesalahan tak terduga: {e}")
+        # Tambahkan respons bot ke riwayat
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
-    # Menampilkan status proyek saat ini untuk debugging (opsional)
-    st.subheader("Status Proyek (Debugging)")
-    st.json(st.session_state.projects)
-
+# Blok ini memulai eksekusi program
 if __name__ == "__main__":
+    # PERBAIKAN: Baris 'main()' sekarang diindentasi dengan benar di dalam blok 'if'.
+    # Ini menyelesaikan IndentationError.
     main()
+

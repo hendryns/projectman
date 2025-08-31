@@ -1,18 +1,60 @@
-# 🤖 Bot Manajemen Proyek dengan Gemini & Streamlit
+Chatbot Asisten Manajemen Proyek
+Ini adalah aplikasi chatbot sederhana yang dibangun dengan Python, Streamlit, Langchain, dan Google Gemini API. Chatbot ini dirancang untuk bertindak sebagai asisten manajemen proyek, menjawab pertanyaan, dan memberikan wawasan tentang berbagai topik manajemen proyek.
 
-Aplikasi ini adalah bot manajemen proyek interaktif yang dibuat dengan **Streamlit** dan didukung oleh **Google Gemini** melalui **Langchain**. Bot ini dapat memahami perintah bahasa alami untuk membuat proyek, menambahkan tugas, dan melihat status proyek.
+Fitur
+Antarmuka chat yang interaktif dan mudah digunakan.
 
-## Persiapan & Deployment
+Didukung oleh model bahasa canggih dari Google (Gemini-Pro).
 
-### 1. Dapatkan Kunci API Gemini
+Memiliki pengetahuan dasar tentang metodologi proyek (Agile, Scrum, Waterfall), manajemen risiko, penjadwalan, dan alat-alat PM.
 
-Daftarkan diri di Google AI Studio dan dapatkan kunci API Gemini Pro.
+Menyimpan riwayat percakapan untuk konteks yang lebih baik.
 
-### 2. Atur Kunci API
+Prasyarat
+Python 3.8 atau lebih tinggi
 
-Kunci API harus disimpan dengan aman. Jangan pernah meletakkannya langsung di dalam kode.
+Akun Google dan API Key untuk Gemini (Anda bisa mendapatkannya dari Google AI Studio)
 
-#### Untuk Uji Coba Lokal:
-Buat file bernama `.streamlit/secrets.toml` di dalam direktori proyekmu. Isi file tersebut dengan baris ini:
-```toml
-GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+Instalasi dan Cara Menjalankan
+Clone Repositori (atau unduh file-filenya)
+
+# Jika menggunakan git
+git clone <url-repositori-anda>
+cd <nama-folder-proyek>
+
+Buat dan Aktifkan Lingkungan Virtual (Virtual Environment)
+Ini adalah praktik terbaik untuk menjaga dependensi proyek tetap terisolasi.
+
+# Membuat environment
+python -m venv venv
+
+# Mengaktifkan di Windows
+.\venv\Scripts\activate
+
+# Mengaktifkan di macOS/Linux
+source venv/bin/activate
+
+Install Dependensi
+Pastikan Anda berada di direktori proyek yang berisi file requirements.txt.
+
+pip install -r requirements.txt
+
+Atur API Key Anda
+
+Buat file baru bernama .env di direktori utama proyek.
+
+Buka file .env dan tambahkan API Key Google Anda seperti berikut:
+
+GOOGLE_API_KEY="MASUKKAN_API_KEY_ANDA_DISINI"
+
+Ganti MASUKKAN_API_KEY_ANDA_DISINI dengan kunci API yang Anda dapatkan dari Google.
+
+Jalankan Aplikasi Streamlit
+Buka terminal Anda, pastikan Anda berada di direktori proyek, dan jalankan perintah berikut:
+
+streamlit run app.py
+
+Buka di Browser
+Aplikasi akan secara otomatis terbuka di browser web default Anda. Jika tidak, buka URL yang ditampilkan di terminal (biasanya http://localhost:8501).
+
+Selamat! Sekarang Anda dapat mulai berinteraksi dengan asisten manajemen proyek Anda.
