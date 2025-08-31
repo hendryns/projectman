@@ -35,7 +35,7 @@ def main():
         # Pastikan GOOGLE_API_KEY tersedia di st.secrets
         if "GOOGLE_API_KEY" in st.secrets:
             api_key = st.secrets["GOOGLE_API_KEY"]
-            llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7, google_api_key=api_key)
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7, google_api_key=api_key)
             st.session_state.conversation = ConversationChain(
                 prompt=PROMPT,
                 llm=llm,
