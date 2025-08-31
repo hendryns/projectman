@@ -56,12 +56,13 @@ def main():
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.7, google_api_key=api_key)
 
         # --- PERUBAHAN DI SINI ---
-        # Mengganti chain_type ke "map_reduce" untuk pemahaman yang lebih baik dari keseluruhan dokumen.
-        # Metode ini mungkin sedikit lebih lambat, tetapi lebih menyeluruh.
+        # 1. Mengganti chain_type ke "map_reduce" untuk pemahaman yang lebih baik.
+        # 2. Menambahkan `search_kwargs={"k": 8}` pada retriever untuk mengambil lebih banyak potongan teks (chunks).
+        #    Ini meningkatkan kemungkinan semua literatur yang relevan ditemukan sebelum diproses.
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
-            chain_type="map_reduce", # <-- Diubah dari "stuff"
-            retriever=vector_store.as_retriever()
+            chain_type="map_reduce",
+            retriever=vector_store.as_retriever(search_kwargs={"k": 8}) # <-- PENAMBAHAN
         )
         # -------------------------
 
