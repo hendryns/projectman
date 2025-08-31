@@ -57,57 +57,71 @@ def main():
 
     if st.button("Kirim"):
         if user_query:
-            try:
-                # Memanggil Langchain untuk memproses query dengan Gemini
-                st.info("Memproses perintah...")
-                raw_response = llm_chain.run(query=user_query)
-                
-                # Mengurai JSON dari respons Gemini
-                parsed_data = json.loads(raw_response.strip())
-                
-                intent = parsed_data.get("intent")
-                
-                if intent == "create_project":
-                    project_name = parsed_data.get("project_name")
-                    if project_name and project_name not in st.session_state.projects:
-                        st.session_state.projects[project_name] = []
-                        st.success(f"✅ Proyek **'{project_name}'** berhasil dibuat!")
-                    elif project_name:
-                        st.warning(f"⚠️ Proyek **'{project_name}'** sudah ada.")
+            
+try:
+    # Memanggil Langchain untuk memproses query dengan Gemini
+    st.info("Memproses perintah...")
+    raw_response = llm_chain.run(query=user_query)
+    
+    # --- Solusi: Mencari dan membersihkan JSON dari respons ---
+    start_index = raw_response.find('{')
+    end_index = raw_response.rfind('}')
+    
+    if start_index != -1 and end_index != -1:
+        # Ekstrak string JSON yang valid
+        json_string = raw_response[start_index : end_index + 1]
+        
+        # Mengurai JSON dari respons Gemini
+        parsed_data = json.loads(json_string)
+        
+        # ... (Logika pemrosesan intent yang sudah ada) ...
+        intent = parsed_data.get("intent")
+        
+        if intent == "create_project":
+            project_name = parsed_data.get("project_name")
+            if project_name and project_name not in st.session_state.projects:
+                st.session_state.projects[project_name] = []
+                st.success(f"✅ Proyek **'{project_name}'** berhasil dibuat!")
+            elif project_name:
+                st.warning(f"⚠️ Proyek **'{project_name}'** sudah ada.")
+            else:
+                st.error("❌ Nama proyek tidak ditemukan.")
+
+        elif intent == "add_task":
+            task_name = parsed_data.get("task_name")
+            project_name = parsed_data.get("project_name")
+            if project_name and task_name and project_name in st.session_state.projects:
+                st.session_state.projects[project_name].append(task_name)
+                st.success(f"✅ Tugas **'{task_name}'** berhasil ditambahkan ke proyek **'{project_name}'**.")
+            elif project_name:
+                st.error(f"❌ Proyek **'{project_name}'** tidak ditemukan.")
+            else:
+                st.error("❌ Nama tugas atau proyek tidak ditemukan.")
+
+        elif intent == "show_projects":
+            st.success("Berikut daftar proyek kamu:")
+            if st.session_state.projects:
+                for project, tasks in st.session_state.projects.items():
+                    st.subheader(f"📂 {project}")
+                    if tasks:
+                        for i, task in enumerate(tasks):
+                            st.write(f"   - {i+1}. {task}")
                     else:
-                        st.error("❌ Nama proyek tidak ditemukan.")
+                        st.write("   _(Tidak ada tugas)_")
+            else:
+                st.write("Belum ada proyek yang dibuat.")
 
-                elif intent == "add_task":
-                    task_name = parsed_data.get("task_name")
-                    project_name = parsed_data.get("project_name")
-                    if project_name and task_name and project_name in st.session_state.projects:
-                        st.session_state.projects[project_name].append(task_name)
-                        st.success(f"✅ Tugas **'{task_name}'** berhasil ditambahkan ke proyek **'{project_name}'**.")
-                    elif project_name:
-                        st.error(f"❌ Proyek **'{project_name}'** tidak ditemukan.")
-                    else:
-                        st.error("❌ Nama tugas atau proyek tidak ditemukan.")
+        else:
+            st.warning("Maaf, saya tidak mengerti perintah itu.")
 
-                elif intent == "show_projects":
-                    st.success("Berikut daftar proyek kamu:")
-                    if st.session_state.projects:
-                        for project, tasks in st.session_state.projects.items():
-                            st.subheader(f"📂 {project}")
-                            if tasks:
-                                for i, task in enumerate(tasks):
-                                    st.write(f"   - {i+1}. {task}")
-                            else:
-                                st.write("   _(Tidak ada tugas)_")
-                    else:
-                        st.write("Belum ada proyek yang dibuat.")
-
-                else:
-                    st.warning("Maaf, saya tidak mengerti perintah itu.")
-
-            except json.JSONDecodeError:
-                st.error("❌ Terjadi kesalahan dalam memproses respons AI. Mohon coba lagi.")
-            except Exception as e:
-                st.error(f"❌ Terjadi kesalahan tak terduga: {e}")
+    else:
+        st.error("❌ Respons AI tidak mengandung format JSON yang valid. Coba lagi atau periksa respons model.")
+        st.write("Respons mentah (raw response) dari model:", raw_response)
+        
+except json.JSONDecodeError:
+    st.error("❌ Terjadi kesalahan dalam mengurai respons AI. Mohon coba lagi.")
+except Exception as e:
+    st.error(f"❌ Terjadi kesalahan tak terduga: {e}")
 
     # Menampilkan status proyek saat ini untuk debugging (opsional)
     st.subheader("Status Proyek (Debugging)")
