@@ -1,4 +1,7 @@
 Chatbot Project Management dengan PDF dan Gemini AI
+
+https://projectman-fuhrrzvx4z3fpxwlfpdduv.streamlit.app/
+
 Ini adalah aplikasi chatbot sederhana yang dibangun menggunakan Python, Streamlit, LangChain, dan Google Gemini API. Aplikasi ini memungkinkan pengguna untuk mengunggah dokumen manajemen proyek dalam format PDF dan mengajukan pertanyaan terkait isinya.
 
 Fitur
