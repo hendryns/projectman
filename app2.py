@@ -53,16 +53,17 @@ def main():
         pdf_bytes = uploaded_file.getvalue()
         vector_store = setup_rag_pipeline(api_key, pdf_bytes)
 
-        # --- PERUBAHAN DI SINI ---
-        # Mengganti model "gemini-pro" dengan model yang lebih baru dan tersedia
         llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.7, google_api_key=api_key)
-        # -------------------------
 
+        # --- PERUBAHAN DI SINI ---
+        # Mengganti chain_type ke "map_reduce" untuk pemahaman yang lebih baik dari keseluruhan dokumen.
+        # Metode ini mungkin sedikit lebih lambat, tetapi lebih menyeluruh.
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
-            chain_type="stuff",
+            chain_type="map_reduce", # <-- Diubah dari "stuff"
             retriever=vector_store.as_retriever()
         )
+        # -------------------------
 
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -77,7 +78,7 @@ def main():
                 st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                with st.spinner("Menganalisis dokumen dan mencari jawaban..."):
+                with st.spinner("Menganalisis dokumen secara mendalam..."):
                     response = qa_chain.invoke(prompt)
                     st.markdown(response['result'])
             
