@@ -1,6 +1,11 @@
 import streamlit as st
 import os
 import tempfile
+import nest_asyncio
+
+# Patch untuk mengizinkan event loop asyncio yang nested
+nest_asyncio.apply()
+
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
@@ -51,11 +56,11 @@ def main():
     st.markdown("Unggah dokumen PDF Anda dan tanyakan apa saja tentang isinya.")
 
     # Pastikan GOOGLE_API_KEY tersedia
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("GEMINI_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
+    if "GOOGLE_API_KEY" not in st.secrets:
+        st.error("GOOGLE_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
         st.stop()
     
-    api_key = st.secrets["GEMINI_API_KEY"]
+    api_key = st.secrets["GOOGLE_API_KEY"]
     
     # 1. Widget untuk mengunggah file
     uploaded_file = st.file_uploader("Pilih file PDF Anda", type="pdf")
@@ -69,7 +74,7 @@ def main():
         vector_store = setup_rag_pipeline(api_key, pdf_bytes)
 
         # Siapkan LLM dan RAG Chain
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7, google_api_key=api_key)
+        llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7, google_api_key=api_key)
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -100,3 +105,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
