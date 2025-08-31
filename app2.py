@@ -1,104 +1,136 @@
 import streamlit as st
-import os
-import tempfile
-import nest_asyncio
-
-# Patch untuk mengizinkan event loop asyncio yang nested
-nest_asyncio.apply()
-
-# Import pustaka yang dibutuhkan untuk Google Gemini
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.chains import RetrievalQA
-from langchain_community.vectorstores import FAISS
+from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
+import os
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import google.generativeai as genai
+from langchain_community.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
+from dotenv import load_dotenv
 
-# Menggunakan cache untuk menyimpan resource dan mencegah re-run yang mahal
-@st.cache_resource
-def setup_rag_pipeline(api_key, pdf_bytes):
+# Memuat variabel lingkungan dari file .env
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("GOOGLE_API_KEY tidak ditemukan. Harap buat file .env dan tambahkan kunci API Anda.")
+
+def get_pdf_text(pdf_docs):
     """
-    Mempersiapkan pipeline RAG dari bytes file PDF yang diunggah menggunakan Google Gemini.
+    Mengekstrak teks dari daftar file PDF yang diunggah.
     """
-    try:
-        # Membuat file sementara untuk dibaca oleh PyPDFLoader
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(pdf_bytes)
-            tmp_file_path = tmp_file.name
-        
-        loader = PyPDFLoader(tmp_file_path)
-        docs = loader.load()
-    finally:
-        # Membersihkan file sementara setelah selesai dibaca
-        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
-            os.remove(tmp_file_path)
+    text = ""
+    for pdf in pdf_docs:
+        pdf_reader = PdfReader(pdf)
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+    return text
+
+def get_text_chunks(text):
+    """
+    Memecah teks mentah menjadi potongan-potongan (chunks) yang lebih kecil.
+    """
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_text(text)
+    return chunks
+
+def get_vector_store(text_chunks):
+    """
+    Membuat vector store dari potongan teks menggunakan embeddings Google GenAI.
+    Menyimpan vector store secara lokal jika belum ada.
+    """
+    if not text_chunks:
+        st.warning("Tidak ada teks untuk diproses. Silakan unggah PDF.")
+        return None
     
-    # Memecah dokumen menjadi potongan-potongan teks yang lebih kecil (chunks)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    text_chunks = text_splitter.split_documents(docs)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     
-    # Membuat embeddings (representasi numerik) dari teks menggunakan model Google
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+    # Membuat vector store baru dari dokumen
+    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     
-    # Membuat vector store menggunakan FAISS untuk pencarian cepat
-    vector_store = FAISS.from_documents(text_chunks, embeddings)
+    # Menyimpan vector store secara lokal
+    vector_store.save_local("faiss_index")
+    st.success("Vector store berhasil dibuat dan disimpan!")
     return vector_store
 
-def main():
-    """Fungsi utama untuk menjalankan aplikasi Streamlit."""
-    st.set_page_config(page_title="Asisten Dokumen PDF", page_icon="📄")
 
-    st.title("📄 Asisten Dokumen PDF")
-    st.markdown("Unggah dokumen PDF Anda dan tanyakan apa saja tentang isinya.")
+def get_conversational_chain():
+    """
+    Membuat dan mengembalikan conversational chain untuk tanya jawab.
+    """
+    prompt_template = """
+    Jawab pertanyaan sedetail mungkin dari konteks yang diberikan. Pastikan untuk memberikan semua detailnya. Jika jawabannya tidak ada dalam konteks yang diberikan, katakan saja, "jawaban tidak tersedia dalam konteks", jangan memberikan jawaban yang salah.
 
-    # Memeriksa keberadaan GOOGLE_API_KEY di Streamlit Secrets
-    if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("GOOGLE_API_KEY tidak ditemukan. Harap atur di Streamlit Secrets Anda.")
-        st.stop()
-    
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    
-    # Widget untuk mengunggah file
-    uploaded_file = st.file_uploader("Pilih file PDF Anda", type="pdf")
+    Konteks:
+    {context}
 
-    # Logika utama hanya berjalan jika file sudah diunggah
-    if uploaded_file is not in None:
-        pdf_bytes = uploaded_file.getvalue()
-        vector_store = setup_rag_pipeline(api_key, pdf_bytes)
+    Pertanyaan:
+    {question}
 
-        # Menginisialisasi model bahasa (LLM) dari Google Gemini
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.7, google_api_key=api_key)
+    Jawaban:
+    """
+    model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    return chain
 
-        # Membuat RAG chain dengan tipe "refine" untuk menghindari error rate limit
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="refine",
-            retriever=vector_store.as_ retriever(search_kwargs={"k": 8})
+def user_input(user_question):
+    """
+    Menangani input pengguna, melakukan pencarian di vector store, dan mendapatkan respons.
+    """
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        
+        # Memuat vector store dari lokal
+        new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+        docs = new_db.similarity_search(user_question)
+        
+        chain = get_conversational_chain()
+        
+        response = chain(
+            {"input_documents": docs, "question": user_question},
+            return_only_outputs=True
         )
+        
+        st.write("Balasan: ", response["output_text"])
 
-        # Inisialisasi riwayat chat jika belum ada
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    except FileNotFoundError:
+        st.error("File index FAISS tidak ditemukan. Silakan unggah dan proses PDF terlebih dahulu.")
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {e}")
 
-        # Menampilkan riwayat chat
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
 
-        # Menerima input dari pengguna
-        if prompt := st.chat_input(f"Tanya tentang {uploaded_file.name}..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+def main():
+    st.set_page_config(page_title="Chatbot Project Management", page_icon="🤖")
+    
+    st.header("Chatbot Cerdas untuk Manajemen Proyek 🤖")
+    
+    user_question = st.text_input("Ajukan Pertanyaan tentang Dokumen Proyek Anda")
 
-            # Menampilkan respons dari asisten
-            with st.chat_message("assistant"):
-                with st.spinner("Menganalisis dokumen secara mendalam..."):
-                    response = qa_chain.invoke(prompt)
-                    st.markdown(response['result'])
-            
-            # Menyimpan respons asisten ke riwayat chat
-            st.session_state.messages.append({"role": "assistant", "content": response['result']})
+    if user_question:
+        user_input(user_question)
+
+    with st.sidebar:
+        st.title("Menu")
+        st.write("Unggah dokumen PDF proyek Anda di sini dan klik tombol 'Proses' untuk memulai.")
+        pdf_docs = st.file_uploader("Unggah File PDF", accept_multiple_files=True, type="pdf")
+        
+        if st.button("Proses"):
+            if pdf_docs:
+                with st.spinner("Memproses dokumen... Ini mungkin memakan waktu beberapa saat."):
+                    # 1. Ekstrak teks dari PDF
+                    raw_text = get_pdf_text(pdf_docs)
+                    
+                    # 2. Pecah teks menjadi chunks
+                    text_chunks = get_text_chunks(raw_text)
+                    
+                    # 3. Buat dan simpan vector store
+                    get_vector_store(text_chunks)
+            else:
+                st.warning("Harap unggah setidaknya satu file PDF.")
 
 if __name__ == "__main__":
     main()
-
